@@ -17,7 +17,7 @@ The analysis is divided into four main functional steps:
 
 
 ## 📂 Data Structure
-To ensure the script runs correctly, please organize your local directory to match the structure provided in the **[`Processed_Data`](https://github.com/xtxtzheng-art/Large-Herbivore-Movement-Traits/tree/main/Processed_Data.git)** folder of this repository.
+To ensure the script runs correctly, please organize your local directory to match the structure provided in the **[`Processed_Data`](https://github.com/xtxtzheng-art/Large-Herbivore-Movement-Traits/tree/main/Processed_Data)** folder of this repository.
 ### Key Components:
 * **Root Level Files**:
 * 
@@ -77,6 +77,7 @@ If you use this code or data in your research, please cite:
 
 ## 📧 Contact
 For questions regarding the data or code, please open an issue in this repository or contact **xuetingzheng@smail.nju.edu.cn**.
+
 
 
 
