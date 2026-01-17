@@ -1,4 +1,4 @@
-# Large Herbivore Movement Traits Analysis
+# Broad-scale patterns of large herbivore species richness are linked to movement-related traits
 This repository contains the R scripts and data structures for analyzing the movement traits of large herbivores. The workflow integrates multi-scale environmental data with movement traits to investigate their influence on species richness through a series of statistical steps, including VIF selection, Spatial COM-Poisson modeling, and Independent Explanatory Power (IEP) calculation.
 
 
@@ -77,3 +77,4 @@ If you use this code or data in your research, please cite:
 
 ## 📧 Contact
 For questions regarding the data or code, please open an issue in this repository or contact **xuetingzheng@smail.nju.edu.cn**.
+
