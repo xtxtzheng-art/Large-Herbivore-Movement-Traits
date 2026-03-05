@@ -3,7 +3,7 @@
 # Description: Multi-step workflow including VIF selection, Spatial COM-Poisson 
 #              modeling (spaMM), Pseudo-R2 calculation, and Visualization.
 # Author: Xueting Zheng/Nanjing University
-# Date: 2026
+# Year: 2026
 ################################################################################
 
 # Load Required Libraries
@@ -20,9 +20,9 @@ library(reshape2)
 # 0. Global Configurations
 # ==============================================================================
 # Change this path to your local repository root
-project_root <- "Change_this_path"
-data_path <- file.path(project_root, "Change_this_path")
-output_root <- file.path(project_root, "Change_this_path")
+project_root <- getwd() 
+data_path    <- file.path(project_root, "Processed_Data", "VIF_Input")
+output_root  <- file.path(project_root, "Results")
 
 # Model Configuration Mapping
 # A=local, D=context, C=macro_fixed, E=move_trait, F_var=bodymass, MS=macro_scale
@@ -129,8 +129,83 @@ fit_single_rep <- function(rep_idx, data_source, coords_source, id_source, formu
   }, error = function(e) list(success = FALSE, error = e$message))
 }
 
-# Principal loop for Step 2 (Simplified for demo)
-# You can call main_loop() here as defined in your original Step 2 code.
+# --- Parallel Execution Configuration ---
+n_reps <- 100          # Number of iterations (bootstrap/sampling)
+# Automatically detect CPU cores and reserve 2 for system stability
+n_cores <- parallel::detectCores() - 2  
+sample_size <- 2772    # Sample size for each iteration
+dmax_val <- 200000     # Max distance for spatial weight matrix (adjust units as needed)
+
+# Helper function to dynamically generate formulas based on model configurations
+# Maps symbols (A, D, C, E) to actual variable groups in your dataset
+get_formula <- function(config) {
+  # Base variables (Local, Macro, BodyMass)
+  # Ensure these variable names match your column headers in Processed_Data
+  base_vars <- c("Local_Var", "Macro_Var", "BodyMass") 
+  
+  if ("D" %in% config) base_vars <- c(base_vars, "Context_Var")
+  if ("E" %in% config) base_vars <- c(base_vars, "Trait_Var")
+  
+  # Construct spaMM formula with spatial term (adjMatrix)
+  formula_str <- paste("SR ~", paste(base_vars, collapse = " + "), "+ (1|adjMatrix)")
+  return(as.formula(formula_str))
+}
+
+# --- Main Modeling Loop ---
+# Iterates through all model configurations (lcmxfMS, etc.) and spatial scales
+for (model_name in names(model_configs)) {
+  config <- model_configs[[model_name]]
+  formula_obj <- get_formula(config)
+  
+  for (scale in scales) {
+    message(sprintf("Processing: Model [%s] at Scale [%s km]...", model_name, scale))
+    
+    # 1. Load data for the specific scale
+    # Expected path: project_root/Processed_Data/scale_data_10km.csv
+    data_file <- file.path(project_root, "Processed_Data", paste0("scale_data_", scale, "km.csv"))
+    
+    if (!file.exists(data_file)) {
+      warning(paste("Data file not found, skipping:", data_file))
+      next
+    }
+    
+    current_data <- read.csv(data_file)
+    current_coords <- current_data[, c("X", "Y")] # Ensure X and Y coordinates exist
+    
+    # 2. Setup Parallel Cluster
+    cl <- makeCluster(n_cores)
+    
+    # Export necessary objects and libraries to each worker node
+    clusterExport(cl, c("fit_single_rep", "current_data", "current_coords", 
+                        "formula_obj", "sample_size", "dmax_val"))
+    clusterEvalQ(cl, {
+      library(spaMM)
+      library(spdep)
+    })
+    
+    # 3. Execute Parallel Computing via parLapply
+    results <- parLapply(cl, 1:n_reps, function(i) {
+      fit_single_rep(i, current_data, current_coords, current_data$Id, 
+                     formula_obj, sample_size, dmax_val)
+    })
+    
+    stopCluster(cl) # Free up system resources
+    
+    # 4. Extract and Save Successful Results
+    success_results <- do.call(rbind, lapply(results, function(x) if(x$success) x$combined_results))
+    
+    if (!is.null(success_results)) {
+      success_results$Rep <- 1:nrow(success_results)
+      
+      # Create output directory: output_root/model_scale/
+      out_path <- file.path(output_root, paste0(model_name, "_", scale, "km"))
+      if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
+      
+      write.csv(success_results, file.path(out_path, "R2_results.csv"), row.names = FALSE)
+      message(paste("Successfully saved modeling results to:", out_path))
+    }
+  }
+}
 
 # ==============================================================================
 # STEP 3: Independent Explanatory Power (IEP) Calculation
@@ -221,3 +296,4 @@ plot_iep_distribution <- function(input_csv, out_dir) {
 # Final message
 
 message("Script setup complete. Ensure paths are correctly configured before running full loops.")
+
