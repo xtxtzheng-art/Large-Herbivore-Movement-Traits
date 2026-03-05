@@ -139,7 +139,55 @@ fit_single_rep <- function(rep_idx, data_source, coords_source, id_source, formu
 
 # This section iterates through the output folders of Step 2,
 # aligns "Rep" IDs, and subtracts R2 values (e.g., Full - Reduced).
-# [Reference your Step 3 logic here for specific pair comparisons]
+# Example: Calculating IEP of "Landscape Context" 
+# by comparing lcmxfMS (Full) and lmxfMS (Reduced without context)
+comparison_pairs <- list(
+  "Landscape_Context_IEP" = c(full = "lcmxfMS", reduced = "lmxfMS"),
+  "Movement_Traits_IEP"   = c(full = "lcmxfMS", reduced = "lcmfMS")
+)
+
+scales <- c("10", "20", "40", "100", "200", "400") # Define scales analyzed
+
+for (pair_name in names(comparison_pairs)) {
+  pair <- comparison_pairs[[pair_name]]
+  results_list <- list()
+  
+  for (scale in scales) {
+    # Construct folder paths based on Step 2 output structure
+    full_path <- file.path(output_root, paste0(pair["full"], "_", scale, "km"), "R2_results.csv")
+    red_path  <- file.path(output_root, paste0(pair["reduced"], "_", scale, "km"), "R2_results.csv")
+    
+    if (file.exists(full_path) && file.exists(red_path)) {
+      full_df <- read.csv(full_path)
+      red_df  <- read.csv(red_path)
+      
+      # Ensure reps are aligned by ID (assuming 'Rep' column exists)
+      merged <- merge(full_df[, c("Rep", "PseudoR2")], 
+                      red_df[, c("Rep", "PseudoR2")], 
+                      by = "Rep", suffixes = c("_full", "_red"))
+      
+      # Calculate IEP: (Full R2 - Reduced R2) * 100 for percentage
+      merged[[paste0("Scale_", scale)]] <- (merged$PseudoR2_full - merged$PseudoR2_red) * 100
+      
+      results_list[[scale]] <- merged[, c("Rep", paste0("Scale_", scale))]
+    } else {
+      warning(paste("Missing data for", pair_name, "at scale", scale))
+    }
+  }
+  
+  # Combine all scales into one table
+  if (length(results_list) > 0) {
+    final_iep_df <- Reduce(function(x, y) merge(x, y, by = "Rep", all = TRUE), results_list)
+    
+    # Save the IEP results for Visualization (Step 4)
+    iep_output_path <- file.path(output_root, paste0(pair_name, "_Summary.csv"))
+    write.csv(final_iep_df, iep_output_path, row.names = FALSE)
+    message(paste("IEP calculation completed for:", pair_name))
+    
+    # Optional: Automatically trigger Step 4 plot
+    # plot_iep_distribution(iep_output_path, output_root)
+  }
+}
 
 # ==============================================================================
 # STEP 4: Data Visualization (Boxplots)
@@ -171,4 +219,5 @@ plot_iep_distribution <- function(input_csv, out_dir) {
 }
 
 # Final message
+
 message("Script setup complete. Ensure paths are correctly configured before running full loops.")
