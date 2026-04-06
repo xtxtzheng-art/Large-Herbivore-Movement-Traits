@@ -91,7 +91,7 @@ lapply(flist, function(name) {
 })
 
 # ==============================================================================
-# STEP 2: Spatial COM-Poisson Modeling (Parallel)
+# STEP 2: Spatial COM-Poisson Modeling
 # ==============================================================================
 
 # Core function for single iteration
@@ -162,7 +162,7 @@ for (model_name in names(model_configs)) {
 }
 
 # ==============================================================================
-# STEP 3: IEP Calculation (Delta R2)
+# STEP 3: IEP Calculation
 # ==============================================================================
 comparison_pairs <- list(
   "Landscape_Context_IEP" = c(full = "lcmxfMS", reduced = "lmxfMS"),
@@ -188,24 +188,81 @@ for (pair_name in names(comparison_pairs)) {
 }
 
 # ==============================================================================
-# STEP 4: Visualization
+# STEP 4: Visualization with Robust Data Cleaning
 # ==============================================================================
+
+# Robust cleaning function using MAD
+clean_iep_data <- function(vec, mad_threshold = 3) {
+  # 1. Remove NA and basic illogical values (IEP shouldn't be negative or physically impossible)
+  vec <- vec[!is.na(vec) & vec >= 0 & vec <= 100]
+  
+  if (length(vec) < 3) return(numeric(0))
+  
+  # 2. MAD Calculation
+  median_val <- median(vec)
+  mad_val <- mad(vec, constant = 1.4826) # standard constant for normal distribution consistency
+  
+  # 3. Define bounds
+  lower_bound <- median_val - mad_threshold * mad_val
+  upper_bound <- median_val + mad_threshold * mad_val
+  
+  # 4. Filter
+  cleaned_vec <- vec[vec >= lower_bound & vec <= upper_bound]
+  return(cleaned_vec)
+}
+
 plot_iep <- function(input_csv, out_dir) {
   data <- read.csv(input_csv)
-  df_long <- melt(data, id.vars = "Rep", variable.name = "Scale", value.name = "IEP")
+  
+  # Prepare a list to collect cleaned data per scale
+  cleaned_list <- list()
+  
+  # Identify scale columns (assuming names like "Scale_10", "Scale_20"...)
+  scale_cols <- grep("Scale_", colnames(data), value = TRUE)
+  
+  for (col in scale_cols) {
+    raw_values <- data[[col]]
+    cleaned_values <- clean_iep_data(raw_values)
+    
+    # 5. Quality Control: Only keep scales with at least 3 valid samples
+    if (length(cleaned_values) >= 3) {
+      cleaned_list[[col]] <- data.frame(
+        Rep = 1:length(cleaned_values),
+        Scale = col,
+        IEP = cleaned_values
+      )
+    } else {
+      message(sprintf("Warning: Scale [%s] in [%s] skipped due to insufficient valid samples.", 
+                      col, basename(input_csv)))
+    }
+  }
+  
+  if (length(cleaned_list) == 0) {
+    message(sprintf("Skipping plot for [%s]: No valid data remaining after cleaning.", basename(input_csv)))
+    return(NULL)
+  }
+  
+  # Combine cleaned data back to long format
+  df_long <- do.call(rbind, cleaned_list)
   df_long$Scale <- factor(gsub("Scale_", "", df_long$Scale), levels = scales)
   
+  # 6. Plotting
   p <- ggplot(df_long, aes(x = Scale, y = IEP)) +
-    stat_boxplot(geom ='errorbar', width = 0.25) +
-    geom_boxplot(fill = "white", notch = TRUE, outlier.shape = NA, linewidth = 0.8) +
+    stat_boxplot(geom = 'errorbar', width = 0.25) +
+    geom_boxplot(fill = "white", 
+                 notch = TRUE, 
+                 outlier.shape = 16, # Show outliers as dots after MAD filtering
+                 outlier.size = 1,
+                 linewidth = 0.8) +
     theme_classic() +
-    labs(title = gsub("_Summary.csv", "", basename(input_csv)), x = "Spatial Scale (km)", y = "IEP (%)")
+    labs(title = gsub("_Summary.csv", "", basename(input_csv)), 
+         x = "Spatial Scale (km)", 
+         y = "Independent Explanatory Power (%)") +
+    coord_cartesian(ylim = c(0, 25)) # Focus on realistic range
   
-  ggsave(file.path(out_dir, paste0(basename(input_csv), ".png")), p, width = 7, height = 6)
+  ggsave(file.path(out_dir, paste0(basename(input_csv), "_cleaned.png")), p, width = 7, height = 6)
 }
 
 # Execute Step 4 automatically
 iep_summaries <- list.files(output_root, pattern = "_Summary.csv", full.names = TRUE)
 lapply(iep_summaries, function(f) plot_iep(f, output_root))
-
-message("Full Workflow Complete. Results and Plots are in: ", output_root)
