@@ -58,25 +58,12 @@ The Spatial COM-Poisson modeling (`corrHLfit`) is computationally intensive and 
 1. **Clone the Repository**:
 ```bash
 git clone https://github.com/xtxtzheng-art/Large-Herbivore-Movement-Traits.git
-
 ```
 2. **Configure Paths**:
 Open the R script and modify the `project_root` variable at the top of the file to point to your local data folder.
 3. **Run the Analysis**:
 Execute the script sequentially. You can adjust the `n_reps` parameter in the `main_loop` to perform a smaller number of iterations for testing purposes.
 
-
-
-## 📝 Citation
-If you use this code or data in your research, please cite:
-* **Study Title**: Broad-scale patterns of large herbivore species richness are linked to movement-related traits
-* **Author**: Xueting Zheng/Nanjing University
-* **Journal**: Journal of Animal Ecology, 2026
-
----
-
-## 📧 Contact
-For questions regarding the data or code, please open an issue in this repository or contact **xuetingzheng@smail.nju.edu.cn**.
 
 
 
