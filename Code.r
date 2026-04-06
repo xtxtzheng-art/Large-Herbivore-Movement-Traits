@@ -2,7 +2,6 @@
 # Project: Broad-scale patterns of large herbivore species richness are linked to movement-related traits
 # Description: Integrated workflow: VIF selection -> Spatial COM-Poisson (spaMM) 
 #              -> IEP Calculation -> Visualization.
-# Author: Xueting Zheng / Nanjing University
 # Year: 2026
 ################################################################################
 
